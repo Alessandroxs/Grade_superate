@@ -103,8 +103,8 @@ av.forEach(p=>{if(D[p.student_id])D[p.student_id][p.subject][p.trimester-1].p=+p
 at.forEach(a=>{if(A[a.student_id]&&A[a.student_id][a.date]!='f')A[a.student_id][a.date]=a.status=='absent'?'f':'e'})}
 async function enter(){const{data:{session}}=await sb.auth.getSession(),u=session?.user;if(!u)return false;S.uid=u.id;
 const{data:p}=await sb.from('profiles').select('role,full_name').eq('id',u.id).single();if(!p){await sb.auth.signOut();return false}
-S.role=p.role;S.name=p.full_name;if(p.role=='teacher'){const{data:t}=await sb.from('teachers').select('subject').eq('id',u.id).single();MY=t.subject}
-await loadAll();if(p.role=='teacher')S.v='dash';else{S.v='est';S.sel=u.id;S.tri=1}return true}
+S.role=p.role;S.name=p.full_name;S.mc=false;if(p.role=='teacher'){const{data:t}=await sb.from('teachers').select('subject,must_change_password').eq('id',u.id).single();MY=t.subject;S.mc=t.must_change_password}
+await loadAll();if(p.role=='teacher')S.v='dash';else{S.v='est';S.sel=u.id;S.tri=1}S.modal=S.mc?{t:'pw'}:null;return true}
 async function login(email,pw,role){const er=$('#er');er.textContent='Entrando…';
 const{error}=await sb.auth.signInWithPassword({email,password:pw});if(error){er.textContent='Datos incorrectos. Revisa e inténtalo de nuevo.';return}
 try{await enter()}catch(e){await sb.auth.signOut();er.textContent='No se pudieron cargar los datos: '+e.message;return}
@@ -124,7 +124,7 @@ try{const t=localStorage.getItem('th');if(t)setTh(t)}catch(e){}
 const cur=()=>D[S.sel][MY][S.tri-1];
 
 function loginE(){return`<div class="login"><div class="tools" style="align-items:flex-end">${thm()}</div>${logo}<div class="vals">${VALORES.map(v=>`<span>${v}</span>`).join('')}</div><h1>${INST}</h1><label for="cod">Ingrese su código</label><input id="cod" class="in" inputmode="numeric" placeholder="2026-102" autocomplete="off"><p class="err" id="er">${S.err}</p><button class="btn bl" data-a="inE">Continuar</button><button class="pill" data-a="goT">Teacher</button></div>`}
-function loginT(){return`<div class="login"><div class="tools" style="align-items:flex-end">${thm()}</div>${logo}<h1>${INST}</h1><label for="em">Usuario / correo</label><input id="em" class="in" type="email" autocomplete="username"><label for="pw">Contraseña</label><input id="pw" class="in" type="password" autocomplete="current-password"><p class="err" id="er">${S.err}</p><button class="btn bl" data-a="inT">Continuar</button><button class="lk" data-a="goE" style="text-align:center">Soy estudiante</button><p class="mut">Cambiando vidas vía educación</p></div>`}
+function loginT(){return`<div class="login"><div class="tools" style="align-items:flex-end">${thm()}</div>${logo}<h1>${INST}</h1><label for="em">Usuario / correo</label><input id="em" class="in" type="email" autocomplete="username"><label for="pw">Contraseña</label><input id="pw" class="in" type="password" autocomplete="current-password"><p class="err" id="er">${S.err}</p><button class="btn bl" data-a="inT">Continuar</button><p class="hint">¿Primer ingreso? Escribe tu correo y, como contraseña, el código que te dio la institución. Después elegirás la tuya.</p><button class="lk" data-a="goE" style="text-align:center">Soy estudiante</button><p class="mut">Cambiando vidas vía educación</p></div>`}
 
 function tbl(t,k,o,T){const rows=o[k].map((r,i)=>`<div class="r"><span class="g">${r.f}</span><span>${r.t}</span><b>${r.n.toFixed(1)}</b>${T?`<button class="dots" data-a="ed" data-k="${k}" data-i="${i}" aria-label="Editar">⋮</button>`:'<span></span>'}${r.c?`<small>${r.c}</small>`:''}</div>`).join('');
 return`<section class="cd"><h3>${t}</h3><div class="r hd"><span class="g">Fecha</span><span class="c">Descripción</span><b>Nota</b><span></span></div>${rows}${T?`<button class="add" data-a="add" data-k="${k}">Añadir +</button>`:''}<div class="pm">Promedio: <b>${f1(k=='d'?aD(o):aA(o))}</b></div></section>`}
@@ -146,7 +146,8 @@ function modal(){const m=S.modal;if(!m)return'';let h='';
 if(m.t=='ed'){const r=m.i<0?{f:'',t:'',n:'',c:''}:cur()[m.k][m.i];h=`<h3>${m.i<0?'Añadir nota':'Editar nota'}</h3><label>Fecha<input id="mf" class="in" placeholder="dd/mm" value="${r.f}"></label><label>Descripción<input id="mt" class="in" value="${r.t}"></label><label>Nota (1.0 a 5.0)<input id="mn" class="in" type="number" min="1" max="5" step=".1" value="${r.n}"></label><label>Comentario extra<input id="mc" class="in" value="${r.c}"></label><p class="err" id="er"></p><button class="btn bl" data-a="sv">Guardar</button>${m.i<0?'':'<button class="btn out" data-a="del">Eliminar nota</button>'}`}
 if(m.t=='mn')h=`<h3>Subir notas</h3><p class="hint">Excel o CSV con las columnas: codigo, trimestre (1-3), tipo (diaria, apreciacion o examen), fecha (dd/mm), descripcion, nota (1.0 a 5.0), comentario. También puedes entrar a un estudiante y usar “Añadir +”.</p><input id="fl" class="in" type="file" accept=".xlsx,.xls,.csv" aria-label="Archivo de notas"><button class="btn bl" data-a="upN">Subir archivo</button>`;
 if(m.t=='ma'){const ls=ST.filter(s=>s.g==S.grade),L={'':'Presente',f:'Faltó',e:'Excusa'};h=`<h3>Subir asistencias</h3><div class="pair"><button class="seg ${S.am?'':'on'}" data-a="am" data-v="0">Llamar lista</button><button class="seg ${S.am?'on':''}" data-a="am" data-v="1">Subir Excel o CSV</button></div>`+(S.am?`<p class="hint">Excel o CSV con las columnas: codigo, fecha (aaaa-mm-dd o dd/mm/aaaa), estado (falto o excusa). Solo se anotan las faltas.</p><input id="fl" class="in" type="file" accept=".xlsx,.xls,.csv" aria-label="Archivo de asistencia"><button class="btn gr" data-a="upA">Subir archivo</button>`:`<p class="hint">${S.grade} · hoy ${TODAY}. Toca para cambiar el estado.</p>${ls.map(s=>`<div class="lr"><span>${s.n}</span><button data-a="cl" data-v="${s.id}" style="${S.lista[s.id]=='f'?'background:#e5484d;color:#fff':S.lista[s.id]=='e'?'background:#f5c518;color:#2b2200':''}">${L[S.lista[s.id]||'']}</button></div>`).join('')}<button class="btn gr" data-a="svl">Guardar lista</button>`)}
-return`<div class="ov"><div class="md" role="dialog" aria-modal="true">${h}<button class="lk" data-a="x" style="text-align:center">Cerrar</button></div></div>`}
+if(m.t=='pw')h=`<h3>Bienvenido/a</h3><p class="hint">Es tu primer ingreso. Confirma tu nombre y elige tu contraseña personal.</p><label>Nombre<input id="pn" class="in" value="${(S.name||'').replace(/"/g,'&quot;')}"></label><label>Nueva contraseña<input id="p1" class="in" type="password" autocomplete="new-password"></label><label>Repite la contraseña<input id="p2" class="in" type="password" autocomplete="new-password"></label><p class="err" id="er"></p><button class="btn bl" data-a="pw">Guardar y entrar</button>`;
+return`<div class="ov"><div class="md" role="dialog" aria-modal="true">${h}${m.t=='pw'?'':'<button class="lk" data-a="x" style="text-align:center">Cerrar</button>'}</div></div>`}
 
 function render(){const v=S.v;$('#app').innerHTML=(v=='le'?loginE():v=='lt'?loginT():v=='dash'?dash():view(v=='det'))+modal()+(S.toast?`<div class="toast" role="status">${S.toast}</div>`:'')}
 let tm;function toast(m){S.toast=m;render();clearTimeout(tm);tm=setTimeout(()=>{S.toast='';const t=$('.toast');t&&t.remove()},m.length>60?6000:2200)}
@@ -182,12 +183,20 @@ await loadAll();S.modal=null;toast(`Se importaron ${out.length} filas`)}
 function exportXls(w){const ts=w=='t'?[curTri()]:[1,2,3],rows=[];
 ST.forEach(x=>ts.forEach(t=>{const o=D[x.id][MY][t-1];rows.push({Estudiante:x.n,Código:x.code,Grado:x.g,Trimestre:t,Apreciación:+aA(o).toFixed(1)||'',Diaria:+aD(o).toFixed(1)||'',Examen:o.e??'',Promedio:P(o)||''})}));
 const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),MY);XLSX.writeFile(wb,`notas_${MY}_${w=='t'?'trimestre'+ts[0]:'anual'}.xlsx`)}
+async function setPw(){const n=$('#pn').value.trim(),a=$('#p1').value,b=$('#p2').value,er=$('#er');
+if(!n)return er.textContent='Escribe tu nombre.';
+if(a.length<8)return er.textContent='La contraseña debe tener al menos 8 caracteres.';
+if(a!=b)return er.textContent='Las contraseñas no coinciden.';
+er.textContent='Guardando…';let r=await sb.auth.updateUser({password:a});
+if(r.error)return er.textContent='No se pudo cambiar la contraseña: '+r.error.message;
+r=await sb.rpc('profesor_listo',{p_nombre:n});if(r.error)return er.textContent='No se pudo guardar tu perfil: '+r.error.message;
+S.name=n;S.mc=false;S.modal=null;render();toast('Contraseña guardada. ¡Bienvenido/a!')}
 function act(a,v){switch(a){
 case'th':return setTh(v.v);
 case'goT':S.v='lt';S.err='';break;case'goE':S.v='le';S.err='';break;
 case'inE':{const c=$('#cod').value.trim();if(!c){$('#er').textContent='Escribe tu código.';return}login(c.toLowerCase()+'@estudiantes.invalid',c,'student');return}
 case'inT':{const e=$('#em').value.trim(),p=$('#pw').value;if(!/\S+@\S+/.test(e)||!p){$('#er').textContent='Escribe un correo válido y tu contraseña.';return}login(e,p,'teacher');return}
-case'out':sb.auth.signOut();ST=[];D={};A={};S.v='le';S.err='';S.menu=false;break;
+case'pw':setPw();return;case'out':sb.auth.signOut();ST=[];D={};A={};S.v='le';S.err='';S.menu=false;break;
 case'subj':S.subj=v.v;break;case'tri':S.tri=v.v=='as'?'as':+v.v;S.menu=false;break;case'menu':S.menu=!S.menu;break;
 case'mo':S.mo=(S.mo+ +v.v+12)%12;break;
 case'dy':setDay(v.v);return;
